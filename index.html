@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Waste Collection Efficiency Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0f1a;
+            --bg-secondary: #111827;
+            --bg-card: #1a2332;
+            --bg-card-hover: #212d40;
+            --accent-green: #10b981;
+            --accent-green-dim: #065f46;
+            --accent-amber: #f59e0b;
+            --accent-amber-dim: #92400e;
+            --accent-red: #ef4444;
+            --accent-red-dim: #991b1b;
+            --accent-blue: #3b82f6;
+            --accent-cyan: #06b6d4;
+            --accent-purple: #8b5cf6;
+            --text-primary: #f9fafb;
+            --text-secondary: #9ca3af;
+            --text-muted: #6b7280;
+            --border: #374151;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .dashboard { max-width: 1600px; margin: 0 auto; padding: 24px; }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 32px;
+            padding-bottom: 24px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .header-left h1 {
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, var(--text-primary), var(--accent-cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header-left p { color: var(--text-secondary); font-size: 14px; }
+
+        .date-range {
+            background: var(--bg-card);
+            padding: 12px 20px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            font-family: 'Space Mono', monospace;
+            font-size: 13px;
+            color: var(--accent-cyan);
+        }
+
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .kpi-card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid var(--border);
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .kpi-card:hover { background: var(--bg-card-hover); transform: translateY(-2px); }
+
+        .kpi-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+        }
+
+        .kpi-card.green::before { background: var(--accent-green); }
+        .kpi-card.amber::before { background: var(--accent-amber); }
+        .kpi-card.blue::before { background: var(--accent-blue); }
+        .kpi-card.purple::before { background: var(--accent-purple); }
+        .kpi-card.cyan::before { background: var(--accent-cyan); }
+
+        .kpi-label {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .kpi-value {
+            font-family: 'Space Mono', monospace;
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .kpi-card.green .kpi-value { color: var(--accent-green); }
+        .kpi-card.amber .kpi-value { color: var(--accent-amber); }
+        .kpi-card.blue .kpi-value { color: var(--accent-blue); }
+        .kpi-card.purple .kpi-value { color: var(--accent-purple); }
+        .kpi-card.cyan .kpi-value { color: var(--accent-cyan); }
+
+        .kpi-sub { font-size: 13px; color: var(--text-secondary); }
+
+        .grid-2x2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+
+        .chart-card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 24px;
+            border: 1px solid var(--border);
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .chart-title { font-size: 16px; font-weight: 600; color: var(--text-primary); }
+        .chart-subtitle { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+        .chart-container { position: relative; height: 280px; }
+        .full-width { grid-column: 1 / -1; }
+
+        .filter-select {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 8px 12px;
+            color: var(--text-primary);
+            font-size: 13px;
+            font-family: 'DM Sans', sans-serif;
+            cursor: pointer;
+            min-width: 220px;
+        }
+
+        .filter-select:focus { outline: none; border-color: var(--accent-cyan); }
+
+        .table-container { overflow-x: auto; max-height: 600px; overflow-y: auto; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+
+        th {
+            text-align: left;
+            padding: 12px 16px;
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            font-weight: 500;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.5px;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-primary);
+        }
+
+        tr:hover td { background: var(--bg-card-hover); }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .status-excellent { background: var(--accent-green-dim); color: var(--accent-green); }
+        .status-good { background: rgba(59, 130, 246, 0.2); color: var(--accent-blue); }
+        .status-warning { background: var(--accent-amber-dim); color: var(--accent-amber); }
+        .status-critical { background: var(--accent-red-dim); color: var(--accent-red); }
+
+        .zone-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .zone-card {
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 16px;
+            text-align: center;
+            border: 1px solid var(--border);
+            transition: all 0.2s ease;
+        }
+
+        .zone-card:hover { border-color: var(--accent-cyan); }
+        .zone-name { font-size: 12px; font-weight: 600; margin-bottom: 8px; color: var(--text-primary); }
+        .zone-rate { font-family: 'Space Mono', monospace; font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+        .zone-tasks { font-size: 10px; color: var(--text-muted); }
+
+        .explanation-panel {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 24px;
+            border: 1px solid var(--border);
+            margin-top: 24px;
+        }
+
+        .explanation-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-top: 20px;
+        }
+
+        .explanation-section {
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .explanation-section h4 {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--accent-cyan);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .explanation-section h4::before {
+            content: '';
+            width: 4px;
+            height: 16px;
+            background: var(--accent-cyan);
+            border-radius: 2px;
+        }
+
+        .explanation-section p {
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            margin-bottom: 12px;
+        }
+
+        .explanation-section ul {
+            list-style: none;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .explanation-section li {
+            padding: 4px 0;
+            padding-left: 16px;
+            position: relative;
+        }
+
+        .explanation-section li::before {
+            content: '•';
+            position: absolute;
+            left: 0;
+            color: var(--accent-cyan);
+        }
+
+        .route-list {
+            max-height: 280px;
+            overflow-y: auto;
+            font-family: 'Space Mono', monospace;
+            font-size: 11px;
+        }
+
+        .route-list-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4px 24px;
+        }
+
+        .insights-panel {
+            background: linear-gradient(135deg, var(--bg-card), var(--bg-secondary));
+            border-radius: 12px;
+            padding: 24px;
+            border: 1px solid var(--border);
+            margin-top: 24px;
+        }
+
+        .insights-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+        }
+
+        .insight-item {
+            padding: 16px;
+            background: var(--bg-primary);
+            border-radius: 8px;
+            border-left: 3px solid;
+        }
+
+        .insight-item.positive { border-color: var(--accent-green); }
+        .insight-item.warning { border-color: var(--accent-amber); }
+        .insight-item.negative { border-color: var(--accent-red); }
+
+        .insight-title {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .insight-text { font-size: 14px; color: var(--text-primary); line-height: 1.5; }
+        .mono { font-family: 'Space Mono', monospace; }
+
+        @media (max-width: 1400px) {
+            .kpi-grid { grid-template-columns: repeat(3, 1fr); }
+        }
+
+        @media (max-width: 1200px) {
+            .kpi-grid { grid-template-columns: repeat(3, 1fr); }
+            .grid-2x2 { grid-template-columns: 1fr; }
+            .zone-grid { grid-template-columns: repeat(4, 1fr); }
+            .insights-grid { grid-template-columns: 1fr; }
+            .explanation-grid { grid-template-columns: 1fr; }
+        }
+
+        @media (max-width: 768px) {
+            .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+            .zone-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <header class="header">
+            <div class="header-left">
+                <h1>Waste Collection Operations</h1>
+                <p>Efficiency Dashboard · CIT Fleet Management</p>
+            </div>
+            <div class="date-range">05 Jan 2026 — 11 Jan 2026</div>
+        </header>
+
+        <div class="kpi-grid">
+            <div class="kpi-card green">
+                <div class="kpi-label">Overall Completion Rate</div>
+                <div class="kpi-value">91.1%</div>
+                <div class="kpi-sub">20,600 of 22,606 tasks done</div>
+            </div>
+            <div class="kpi-card blue">
+                <div class="kpi-label">Total Collections</div>
+                <div class="kpi-value">20,603</div>
+                <div class="kpi-sub">Bins collected this week</div>
+            </div>
+            <div class="kpi-card cyan">
+                <div class="kpi-label">Task Breakdown</div>
+                <div class="kpi-value">22,606</div>
+                <div class="kpi-sub">20,087 Planned · 2,519 Ad Hoc</div>
+            </div>
+            <div class="kpi-card purple">
+                <div class="kpi-label">Active Routes</div>
+                <div class="kpi-value">33</div>
+                <div class="kpi-sub">7 operational areas</div>
+            </div>
+            <div class="kpi-card amber">
+                <div class="kpi-label">Pending Tasks</div>
+                <div class="kpi-value">2,006</div>
+                <div class="kpi-sub">1,408 To Do · 598 Visited</div>
+            </div>
+            <div class="kpi-card green">
+                <div class="kpi-label">Fleet Vehicles</div>
+                <div class="kpi-value">10</div>
+                <div class="kpi-sub">All operational</div>
+            </div>
+        </div>
+
+        <div class="grid-2x2">
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div>
+                        <div class="chart-title">Daily Task Completion by Status</div>
+                        <div class="chart-subtitle">Done, Visited, and To Do breakdown per day</div>
+                    </div>
+                    <select class="filter-select" id="routeFilter">
+                        <option value="all">All Routes</option>
+                        <option value="Sharma-ALD-Aldrees">Sharma-ALD-Aldrees</option>
+                        <option value="Zone 1 (Day) - V 2.0">Zone 1 (Day) - V 2.0</option>
+                        <option value="Zone 1 (Day) - V 2.0 (Friday)">Zone 1 (Day) - V 2.0 (Friday)</option>
+                        <option value="Zone 1 (Night-1) - V 2.0">Zone 1 (Night-1) - V 2.0</option>
+                        <option value="Zone 1 (Night-1) - V 2.0 (Friday)">Zone 1 (Night-1) - V 2.0 (Friday)</option>
+                        <option value="Zone 1 (Night-2) - V 2.0">Zone 1 (Night-2) - V 2.0</option>
+                        <option value="Zone 2 - A (Residence) - V 2.0">Zone 2 - A (Residence) - V 2.0</option>
+                        <option value="Zone 2 - A (Residence) - V 2.0 (Friday)">Zone 2 - A (Residence) - V 2.0 (Friday)</option>
+                        <option value="Zone 2 A (Day) - V 2.0">Zone 2 A (Day) - V 2.0</option>
+                        <option value="Zone 2 A (Friday) V 2.0">Zone 2 A (Friday) V 2.0</option>
+                        <option value="Zone 2 A (Night-1) - V 2.0">Zone 2 A (Night-1) - V 2.0</option>
+                        <option value="Zone 2 A (Night-2) - V 2.0">Zone 2 A (Night-2) - V 2.0</option>
+                        <option value="Zone 2 B (Day) - V 2.0">Zone 2 B (Day) - V 2.0</option>
+                        <option value="Zone 2 B (Friday) V 2.0">Zone 2 B (Friday) V 2.0</option>
+                        <option value="Zone 2 B (Magna) - V 2.0">Zone 2 B (Magna) - V 2.0</option>
+                        <option value="Zone 2 B (Night-1) - V 2.0">Zone 2 B (Night-1) - V 2.0</option>
+                        <option value="Zone 2 B (Night-2) - V 2.0">Zone 2 B (Night-2) - V 2.0</option>
+                        <option value="Zone 2 C (Day) - V 2.0">Zone 2 C (Day) - V 2.0</option>
+                        <option value="Zone 2 C (Friday) V 2.0">Zone 2 C (Friday) V 2.0</option>
+                        <option value="Zone 2 C (Night-1) - V 2.0">Zone 2 C (Night-1) - V 2.0</option>
+                        <option value="Zone 2 C (Night-2) - V 2.0">Zone 2 C (Night-2) - V 2.0</option>
+                        <option value="Zone 3 (AlQan) - V 2.0">Zone 3 (AlQan) - V 2.0</option>
+                        <option value="Zone 3 (Haqal & Jadeed) - V 2.0">Zone 3 (Haqal & Jadeed) - V 2.0</option>
+                        <option value="Zone 3 (Zyath & Highway) - V 2.0">Zone 3 (Zyath & Highway) - V 2.0</option>
+                        <option value="Zone 3 (Zyath Village) - V 2.0">Zone 3 (Zyath Village) - V 2.0</option>
+                        <option value="Zone 4 - AlSuru - V 2.0">Zone 4 - AlSuru - V 2.0</option>
+                        <option value="Zone 4 - Bajdah - V 2.0">Zone 4 - Bajdah - V 2.0</option>
+                        <option value="Zone 4 - Bajdah (Friday) V 2.0">Zone 4 - Bajdah (Friday) V 2.0</option>
+                        <option value="Zone 4 - Nima V 2.0">Zone 4 - Nima V 2.0</option>
+                        <option value="Zone 5 - Shigri (Friday) V 2.0">Zone 5 - Shigri (Friday) V 2.0</option>
+                        <option value="Zone 5 (Shigri Village - Left) - V 2.0">Zone 5 (Shigri Village - Left) - V 2.0</option>
+                        <option value="Zone 5 (Shigri Village - Right) - V 2.0">Zone 5 (Shigri Village - Right) - V 2.0</option>
+                        <option value="Zone 6 (Village B) - V 2.0">Zone 6 (Village B) - V 2.0</option>
+                    </select>
+                </div>
+                <div class="chart-container">
+                    <canvas id="dailyChart"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div>
+                        <div class="chart-title">Vehicle Performance</div>
+                        <div class="chart-subtitle">Completion rate by vehicle</div>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="vehicleChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <div class="chart-header">
+                <div>
+                    <div class="chart-title">Operational Area Performance</div>
+                    <div class="chart-subtitle">Completion rates across all areas (6 zones + Sharma-ALD)</div>
+                </div>
+            </div>
+            <div class="zone-grid">
+                <div class="zone-card">
+                    <div class="zone-name">Zone 1</div>
+                    <div class="zone-rate" style="color: var(--accent-green)">96.2%</div>
+                    <div class="zone-tasks">1,813 / 1,885 tasks</div>
+                </div>
+                <div class="zone-card">
+                    <div class="zone-name">Zone 2</div>
+                    <div class="zone-rate" style="color: var(--accent-green)">93.2%</div>
+                    <div class="zone-tasks">14,762 / 15,845 tasks</div>
+                </div>
+                <div class="zone-card">
+                    <div class="zone-name">Zone 3</div>
+                    <div class="zone-rate" style="color: var(--accent-red)">76.0%</div>
+                    <div class="zone-tasks">974 / 1,281 tasks</div>
+                </div>
+                <div class="zone-card">
+                    <div class="zone-name">Zone 4</div>
+                    <div class="zone-rate" style="color: var(--accent-red)">74.4%</div>
+                    <div class="zone-tasks">882 / 1,185 tasks</div>
+                </div>
+                <div class="zone-card">
+                    <div class="zone-name">Zone 5</div>
+                    <div class="zone-rate" style="color: var(--accent-amber)">87.6%</div>
+                    <div class="zone-tasks">830 / 947 tasks</div>
+                </div>
+                <div class="zone-card">
+                    <div class="zone-name">Zone 6</div>
+                    <div class="zone-rate" style="color: var(--accent-amber)">88.8%</div>
+                    <div class="zone-tasks">839 / 945 tasks</div>
+                </div>
+                <div class="zone-card">
+                    <div class="zone-name">Sharma-ALD</div>
+                    <div class="zone-rate" style="color: var(--accent-green)">96.5%</div>
+                    <div class="zone-tasks">500 / 518 tasks</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid-2x2" style="margin-top: 24px;">
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div>
+                        <div class="chart-title">Task Status Distribution</div>
+                        <div class="chart-subtitle">Breakdown by completion status</div>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="statusChart"></canvas>
+                </div>
+            </div>
+
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div>
+                        <div class="chart-title">Day of Week Performance</div>
+                        <div class="chart-subtitle">Completion rate by weekday</div>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="dowChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="chart-card full-width" style="margin-top: 24px;">
+            <div class="chart-header">
+                <div>
+                    <div class="chart-title">All Routes Performance (33 Routes)</div>
+                    <div class="chart-subtitle">Complete ranking of all operational routes</div>
+                </div>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Route Name</th>
+                            <th>Total</th>
+                            <th>Done</th>
+                            <th>Visited</th>
+                            <th>To Do</th>
+                            <th>Rate</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>1</td><td>Zone 1 (Night-1) - V 2.0</td><td class="mono">300</td><td class="mono">300</td><td class="mono">0</td><td class="mono">0</td><td class="mono">100.0%</td><td><span class="status-badge status-excellent">Excellent</span></td></tr>
+                        <tr><td>2</td><td>Zone 1 (Night-2) - V 2.0</td><td class="mono">337</td><td class="mono">336</td><td class="mono">1</td><td class="mono">0</td><td class="mono">99.7%</td><td><span class="status-badge status-excellent">Excellent</span></td></tr>
+                        <tr><td>3</td><td>Zone 2 C (Day) - V 2.0</td><td class="mono">2,092</td><td class="mono">2,050</td><td class="mono">1</td><td class="mono">41</td><td class="mono">98.0%</td><td><span class="status-badge status-excellent">Excellent</span></td></tr>
+                        <tr><td>4</td><td>Zone 2 B (Night-2) - V 2.0</td><td class="mono">649</td><td class="mono">635</td><td class="mono">0</td><td class="mono">14</td><td class="mono">97.8%</td><td><span class="status-badge status-excellent">Excellent</span></td></tr>
+                        <tr><td>5</td><td>Zone 1 (Day) - V 2.0 (Friday)</td><td class="mono">133</td><td class="mono">130</td><td class="mono">3</td><td class="mono">0</td><td class="mono">97.7%</td><td><span class="status-badge status-excellent">Excellent</span></td></tr>
+                        <tr><td>6</td><td>Zone 2 A (Night-2) - V 2.0</td><td class="mono">914</td><td class="mono">886</td><td class="mono">28</td><td class="mono">0</td><td class="mono">96.9%</td><td><span class="status-badge status-excellent">Excellent</span></td></tr>
+                        <tr><td>7</td><td>Sharma-ALD-Aldrees</td><td class="mono">518</td><td class="mono">500</td><td class="mono">0</td><td class="mono">18</td><td class="mono">96.5%</td><td><span class="status-badge status-excellent">Excellent</span></td></tr>
+                        <tr><td>8</td><td>Zone 2 A (Friday) V 2.0</td><td class="mono">749</td><td class="mono">721</td><td class="mono">22</td><td class="mono">6</td><td class="mono">96.3%</td><td><span class="status-badge status-excellent">Excellent</span></td></tr>
+                        <tr><td>9</td><td>Zone 2 B (Magna) - V 2.0</td><td class="mono">96</td><td class="mono">92</td><td class="mono">4</td><td class="mono">0</td><td class="mono">95.8%</td><td><span class="status-badge status-excellent">Excellent</span></td></tr>
+                        <tr><td>10</td><td>Zone 2 A (Night-1) - V 2.0</td><td class="mono">1,207</td><td class="mono">1,154</td><td class="mono">53</td><td class="mono">0</td><td class="mono">95.6%</td><td><span class="status-badge status-excellent">Excellent</span></td></tr>
+                        <tr><td>11</td><td>Zone 2 C (Friday) V 2.0</td><td class="mono">867</td><td class="mono">820</td><td class="mono">0</td><td class="mono">47</td><td class="mono">94.6%</td><td><span class="status-badge status-excellent">Excellent</span></td></tr>
+                        <tr><td>12</td><td>Zone 2 B (Friday) V 2.0</td><td class="mono">602</td><td class="mono">568</td><td class="mono">4</td><td class="mono">30</td><td class="mono">94.4%</td><td><span class="status-badge status-excellent">Excellent</span></td></tr>
+                        <tr><td>13</td><td>Zone 1 (Day) - V 2.0</td><td class="mono">1,031</td><td class="mono">972</td><td class="mono">59</td><td class="mono">0</td><td class="mono">94.3%</td><td><span class="status-badge status-excellent">Excellent</span></td></tr>
+                        <tr><td>14</td><td>Zone 2 A (Day) - V 2.0</td><td class="mono">1,938</td><td class="mono">1,827</td><td class="mono">74</td><td class="mono">37</td><td class="mono">94.3%</td><td><span class="status-badge status-excellent">Excellent</span></td></tr>
+                        <tr><td>15</td><td>Zone 3 (Haqal & Jadeed) - V 2.0</td><td class="mono">307</td><td class="mono">287</td><td class="mono">19</td><td class="mono">1</td><td class="mono">93.5%</td><td><span class="status-badge status-excellent">Excellent</span></td></tr>
+                        <tr><td>16</td><td>Zone 4 - Bajdah (Friday) V 2.0</td><td class="mono">87</td><td class="mono">81</td><td class="mono">6</td><td class="mono">0</td><td class="mono">93.1%</td><td><span class="status-badge status-excellent">Excellent</span></td></tr>
+                        <tr><td>17</td><td>Zone 2 C (Night-2) - V 2.0</td><td class="mono">1,319</td><td class="mono">1,216</td><td class="mono">0</td><td class="mono">103</td><td class="mono">92.2%</td><td><span class="status-badge status-excellent">Excellent</span></td></tr>
+                        <tr><td>18</td><td>Zone 2 B (Night-1) - V 2.0</td><td class="mono">1,485</td><td class="mono">1,368</td><td class="mono">34</td><td class="mono">83</td><td class="mono">92.1%</td><td><span class="status-badge status-excellent">Excellent</span></td></tr>
+                        <tr><td>19</td><td>Zone 2 - A (Residence) - V 2.0</td><td class="mono">477</td><td class="mono">439</td><td class="mono">37</td><td class="mono">1</td><td class="mono">92.0%</td><td><span class="status-badge status-excellent">Excellent</span></td></tr>
+                        <tr><td>20</td><td>Zone 3 (Zyath & Highway) - V 2.0</td><td class="mono">163</td><td class="mono">149</td><td class="mono">9</td><td class="mono">5</td><td class="mono">91.4%</td><td><span class="status-badge status-excellent">Excellent</span></td></tr>
+                        <tr><td>21</td><td>Zone 2 - A (Residence) - V 2.0 (Friday)</td><td class="mono">78</td><td class="mono">70</td><td class="mono">6</td><td class="mono">2</td><td class="mono">89.7%</td><td><span class="status-badge status-good">Good</span></td></tr>
+                        <tr><td>22</td><td>Zone 1 (Night-1) - V 2.0 (Friday)</td><td class="mono">84</td><td class="mono">75</td><td class="mono">0</td><td class="mono">9</td><td class="mono">89.3%</td><td><span class="status-badge status-good">Good</span></td></tr>
+                        <tr><td>23</td><td>Zone 5 - Shigri (Friday) V 2.0</td><td class="mono">156</td><td class="mono">139</td><td class="mono">15</td><td class="mono">2</td><td class="mono">89.1%</td><td><span class="status-badge status-good">Good</span></td></tr>
+                        <tr><td>24</td><td>Zone 6 (Village B) - V 2.0</td><td class="mono">945</td><td class="mono">839</td><td class="mono">12</td><td class="mono">94</td><td class="mono">88.8%</td><td><span class="status-badge status-good">Good</span></td></tr>
+                        <tr><td>25</td><td>Zone 5 (Shigri Village - Right) - V 2.0</td><td class="mono">472</td><td class="mono">413</td><td class="mono">54</td><td class="mono">5</td><td class="mono">87.5%</td><td><span class="status-badge status-good">Good</span></td></tr>
+                        <tr><td>26</td><td>Zone 5 (Shigri Village - Left) - V 2.0</td><td class="mono">319</td><td class="mono">278</td><td class="mono">39</td><td class="mono">2</td><td class="mono">87.1%</td><td><span class="status-badge status-good">Good</span></td></tr>
+                        <tr style="background: rgba(245, 158, 11, 0.05);"><td>27</td><td>Zone 2 B (Day) - V 2.0</td><td class="mono">1,780</td><td class="mono">1,540</td><td class="mono">37</td><td class="mono">203</td><td class="mono">86.5%</td><td><span class="status-badge status-warning">Warning</span></td></tr>
+                        <tr style="background: rgba(245, 158, 11, 0.05);"><td>28</td><td>Zone 2 C (Night-1) - V 2.0</td><td class="mono">1,592</td><td class="mono">1,376</td><td class="mono">0</td><td class="mono">216</td><td class="mono">86.4%</td><td><span class="status-badge status-warning">Warning</span></td></tr>
+                        <tr style="background: rgba(239, 68, 68, 0.05);"><td>29</td><td>Zone 4 - Nima V 2.0</td><td class="mono">639</td><td class="mono">503</td><td class="mono">41</td><td class="mono">95</td><td class="mono">78.7%</td><td><span class="status-badge status-warning">Warning</span></td></tr>
+                        <tr style="background: rgba(239, 68, 68, 0.05);"><td>30</td><td>Zone 3 (Zyath Village) - V 2.0</td><td class="mono">377</td><td class="mono">291</td><td class="mono">11</td><td class="mono">75</td><td class="mono">77.2%</td><td><span class="status-badge status-warning">Warning</span></td></tr>
+                        <tr style="background: rgba(239, 68, 68, 0.1);"><td>31</td><td>Zone 4 - AlSuru - V 2.0</td><td class="mono">214</td><td class="mono">151</td><td class="mono">10</td><td class="mono">53</td><td class="mono">70.6%</td><td><span class="status-badge status-critical">Critical</span></td></tr>
+                        <tr style="background: rgba(239, 68, 68, 0.12);"><td>32</td><td>Zone 4 - Bajdah - V 2.0</td><td class="mono">245</td><td class="mono">147</td><td class="mono">15</td><td class="mono">83</td><td class="mono">60.0%</td><td><span class="status-badge status-critical">Critical</span></td></tr>
+                        <tr style="background: rgba(239, 68, 68, 0.15);"><td>33</td><td>Zone 3 (AlQan) - V 2.0</td><td class="mono">434</td><td class="mono">247</td><td class="mono">4</td><td class="mono">183</td><td class="mono">56.9%</td><td><span class="status-badge status-critical">Critical</span></td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="grid-2x2" style="margin-top: 24px;">
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div>
+                        <div class="chart-title">Vehicle Utilization Summary</div>
+                        <div class="chart-subtitle">Weekly task allocation per vehicle</div>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr><th>Vehicle</th><th>Total</th><th>Done</th><th>Collections</th><th>Rate</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><strong>REL 6</strong></td><td class="mono">518</td><td class="mono">500</td><td class="mono">500</td><td><span class="status-badge status-excellent">96.5%</span></td></tr>
+                            <tr><td><strong>REL 5</strong></td><td class="mono">4,808</td><td class="mono">4,588</td><td class="mono">4,589</td><td><span class="status-badge status-excellent">95.4%</span></td></tr>
+                            <tr><td><strong>REL 9</strong></td><td class="mono">2,440</td><td class="mono">2,322</td><td class="mono">2,322</td><td><span class="status-badge status-excellent">95.2%</span></td></tr>
+                            <tr><td><strong>REL 15</strong></td><td class="mono">4,726</td><td class="mono">4,443</td><td class="mono">4,443</td><td><span class="status-badge status-excellent">94.0%</span></td></tr>
+                            <tr><td><strong>REL 1</strong></td><td class="mono">2,576</td><td class="mono">2,370</td><td class="mono">2,370</td><td><span class="status-badge status-excellent">92.0%</span></td></tr>
+                            <tr><td><strong>REL 7</strong></td><td class="mono">3,180</td><td class="mono">2,852</td><td class="mono">2,852</td><td><span class="status-badge status-good">89.7%</span></td></tr>
+                            <tr><td><strong>REL 11</strong></td><td class="mono">945</td><td class="mono">839</td><td class="mono">839</td><td><span class="status-badge status-good">88.8%</span></td></tr>
+                            <tr><td><strong>REL 13</strong></td><td class="mono">947</td><td class="mono">830</td><td class="mono">831</td><td><span class="status-badge status-good">87.6%</span></td></tr>
+                            <tr><td><strong>REL 14</strong></td><td class="mono">1,281</td><td class="mono">974</td><td class="mono">974</td><td><span class="status-badge status-warning">76.0%</span></td></tr>
+                            <tr><td><strong>REL 12</strong></td><td class="mono">1,185</td><td class="mono">882</td><td class="mono">883</td><td><span class="status-badge status-critical">74.4%</span></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div>
+                        <div class="chart-title">Service Point Information</div>
+                        <div class="chart-subtitle">From CIT_ServicePoints.xlsx</div>
+                    </div>
+                </div>
+                <div style="padding: 20px 0;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                        <div style="background: var(--bg-secondary); padding: 16px; border-radius: 8px;">
+                            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">Total Service Points</div>
+                            <div style="font-family: 'Space Mono', monospace; font-size: 28px; color: var(--accent-cyan);">3,415</div>
+                            <div style="font-size: 12px; color: var(--text-secondary);">All Active</div>
+                        </div>
+                        <div style="background: var(--bg-secondary); padding: 16px; border-radius: 8px;">
+                            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">Service Point Types</div>
+                            <div style="font-size: 14px; color: var(--text-primary); margin-top: 8px;">
+                                <div>Default: <span class="mono" style="color: var(--accent-cyan);">3,023</span></div>
+                                <div>Special Needs: <span class="mono" style="color: var(--accent-purple);">392</span></div>
+                            </div>
+                        </div>
+                        <div style="background: var(--bg-secondary); padding: 16px; border-radius: 8px;">
+                            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">Asset Types Collected</div>
+                            <div style="font-size: 14px; color: var(--text-primary); margin-top: 8px;">
+                                <div>1100L Bins</div>
+                                <div>240L Bins</div>
+                            </div>
+                        </div>
+                        <div style="background: var(--bg-secondary); padding: 16px; border-radius: 8px;">
+                            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 4px;">Operations Supported</div>
+                            <div style="font-size: 14px; color: var(--text-primary); margin-top: 8px;">
+                                <div>Waste Collection</div>
+                                <div style="font-size: 11px; color: var(--text-muted);">(This dashboard)</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="insights-panel">
+            <div class="chart-header">
+                <div>
+                    <div class="chart-title">Key Insights & Recommendations</div>
+                    <div class="chart-subtitle">Actionable intelligence from this week's data</div>
+                </div>
+            </div>
+            <div class="insights-grid">
+                <div class="insight-item positive">
+                    <div class="insight-title">Top Performers</div>
+                    <div class="insight-text">Zone 1 (96.2%), Sharma-ALD (96.5%), and Zone 2 (93.2%) maintain excellent completion rates. Night shift routes consistently outperform day routes. REL 6 achieves highest vehicle efficiency at 96.5%.</div>
+                </div>
+                <div class="insight-item warning">
+                    <div class="insight-title">Areas of Concern</div>
+                    <div class="insight-text">Zone 3 AlQan (56.9%), Zone 4 Bajdah (60.0%), and Zone 4 AlSuru (70.6%) require immediate attention. Vehicles REL 12 (74.4%) and REL 14 (76.0%) are underperforming significantly.</div>
+                </div>
+                <div class="insight-item negative">
+                    <div class="insight-title">Pending Backlog</div>
+                    <div class="insight-text">2,006 incomplete tasks: 1,408 "To Do" (never visited) concentrated in Zone 2 C Night-1 (216), Zone 2 B Day (203), Zone 3 AlQan (183). 598 "Visited" but uncollected bins need follow-up.</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="explanation-panel">
+            <div class="chart-header">
+                <div>
+                    <div class="chart-title">Data Notes & Methodology</div>
+                    <div class="chart-subtitle">Important information about this analysis</div>
+                </div>
+            </div>
+            <div class="explanation-grid">
+                <div class="explanation-section">
+                    <h4>Data Scope</h4>
+                    <p>This analysis includes <strong>all 22,606 tasks</strong> from the CIT_Tasks.xlsx file:</p>
+                    <ul>
+                        <li><strong>Planned tasks:</strong> 20,087 tasks (88.9%) — Scheduled collections based on route planning</li>
+                        <li><strong>Ad Hoc tasks:</strong> 2,519 tasks (11.1%) — Unscheduled collections added during operations</li>
+                        <li><strong>Analysis period:</strong> January 5–11, 2026 (7 days)</li>
+                    </ul>
+                </div>
+                <div class="explanation-section">
+                    <h4>Task Status Definitions</h4>
+                    <p>Tasks are categorized into three completion statuses:</p>
+                    <ul>
+                        <li><strong>Done:</strong> Task completed successfully, bin collected (20,600 tasks / 91.1%)</li>
+                        <li><strong>Visited:</strong> Service point was visited but collection was not completed (598 tasks / 2.6%) — may indicate access issues, bin not ready, or other operational problems</li>
+                        <li><strong>To Do:</strong> Task was scheduled but service point was never visited (1,408 tasks / 6.2%) — indicates route coverage gaps</li>
+                    </ul>
+                </div>
+                <div class="explanation-section">
+                    <h4>Operational Areas</h4>
+                    <p>The analysis covers 7 distinct operational areas with 33 active routes:</p>
+                    <ul>
+                        <li><strong>Zone 1:</strong> 5 routes — Day, Night-1, Night-2, Day (Friday), Night-1 (Friday)</li>
+                        <li><strong>Zone 2:</strong> 16 routes — Sub-zones A, B, C with Day/Night/Friday/Residence shifts</li>
+                        <li><strong>Zone 3:</strong> 4 routes — AlQan, Zyath Village, Zyath & Highway, Haqal & Jadeed</li>
+                        <li><strong>Zone 4:</strong> 4 routes — Nima, Bajdah, Bajdah (Friday), AlSuru</li>
+                        <li><strong>Zone 5:</strong> 3 routes — Shigri Village Left/Right, Shigri (Friday)</li>
+                        <li><strong>Zone 6:</strong> 1 route — Village B</li>
+                        <li><strong>Sharma-ALD:</strong> 1 route — Independent area not part of numbered zones</li>
+                    </ul>
+                </div>
+                <div class="explanation-section">
+                    <h4>Route Naming Conventions</h4>
+                    <p>Some routes have minor naming differences between the Static Tour file and Tasks file. These are treated as equivalent:</p>
+                    <ul>
+                        <li>"Sharma - ALD - Aldrees" (Static Tour) = "Sharma-ALD-Aldrees" (Tasks)</li>
+                        <li>"Zone 4 - Nima - V 2.0" (Static Tour) = "Zone 4 - Nima V 2.0" (Tasks)</li>
+                        <li>"Zone 5 (Shigri Village) - V 2.0" splits into Left/Right routes in Tasks</li>
+                        <li>Some Friday routes vary in "(Friday)" vs "Friday" formatting</li>
+                    </ul>
+                </div>
+                <div class="explanation-section">
+                    <h4>All 33 Routes Included</h4>
+                    <div class="route-list">
+                        <div class="route-list-grid">
+                            <div>1. Sharma-ALD-Aldrees</div>
+                            <div>18. Zone 2 C (Day) - V 2.0</div>
+                            <div>2. Zone 1 (Day) - V 2.0</div>
+                            <div>19. Zone 2 C (Friday) V 2.0</div>
+                            <div>3. Zone 1 (Day) - V 2.0 (Friday)</div>
+                            <div>20. Zone 2 C (Night-1) - V 2.0</div>
+                            <div>4. Zone 1 (Night-1) - V 2.0</div>
+                            <div>21. Zone 2 C (Night-2) - V 2.0</div>
+                            <div>5. Zone 1 (Night-1) - V 2.0 (Friday)</div>
+                            <div>22. Zone 3 (AlQan) - V 2.0</div>
+                            <div>6. Zone 1 (Night-2) - V 2.0</div>
+                            <div>23. Zone 3 (Haqal & Jadeed) - V 2.0</div>
+                            <div>7. Zone 2 - A (Residence) - V 2.0</div>
+                            <div>24. Zone 3 (Zyath & Highway) - V 2.0</div>
+                            <div>8. Zone 2 - A (Residence) (Friday)</div>
+                            <div>25. Zone 3 (Zyath Village) - V 2.0</div>
+                            <div>9. Zone 2 A (Day) - V 2.0</div>
+                            <div>26. Zone 4 - AlSuru - V 2.0</div>
+                            <div>10. Zone 2 A (Friday) V 2.0</div>
+                            <div>27. Zone 4 - Bajdah - V 2.0</div>
+                            <div>11. Zone 2 A (Night-1) - V 2.0</div>
+                            <div>28. Zone 4 - Bajdah (Friday) V 2.0</div>
+                            <div>12. Zone 2 A (Night-2) - V 2.0</div>
+                            <div>29. Zone 4 - Nima V 2.0</div>
+                            <div>13. Zone 2 B (Day) - V 2.0</div>
+                            <div>30. Zone 5 - Shigri (Friday) V 2.0</div>
+                            <div>14. Zone 2 B (Friday) V 2.0</div>
+                            <div>31. Zone 5 (Shigri Village - Left)</div>
+                            <div>15. Zone 2 B (Magna) - V 2.0</div>
+                            <div>32. Zone 5 (Shigri Village - Right)</div>
+                            <div>16. Zone 2 B (Night-1) - V 2.0</div>
+                            <div>33. Zone 6 (Village B) - V 2.0</div>
+                            <div>17. Zone 2 B (Night-2) - V 2.0</div>
+                            <div></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="explanation-section">
+                    <h4>Performance Thresholds</h4>
+                    <p>Routes and vehicles are categorized by completion rate:</p>
+                    <ul>
+                        <li><span class="status-badge status-excellent" style="font-size: 11px;">Excellent</span> ≥ 90% completion rate</li>
+                        <li><span class="status-badge status-good" style="font-size: 11px;">Good</span> 85–89.9% completion rate</li>
+                        <li><span class="status-badge status-warning" style="font-size: 11px;">Warning</span> 75–84.9% completion rate</li>
+                        <li><span class="status-badge status-critical" style="font-size: 11px;">Critical</span> &lt; 75% completion rate</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        Chart.defaults.color = '#9ca3af';
+        Chart.defaults.borderColor = '#374151';
+        Chart.defaults.font.family = "'DM Sans', sans-serif";
+
+        const dailyData = {
+            "all": {"done": [2963, 3234, 3060, 2888, 2966, 2428, 3061], "visited": [82, 102, 88, 80, 65, 96, 85], "todo": [212, 116, 154, 239, 102, 273, 312]},
+            "Sharma-ALD-Aldrees": {"done": [68, 73, 71, 68, 73, 73, 74], "visited": [0, 0, 0, 0, 0, 0, 0], "todo": [6, 1, 3, 6, 1, 1, 0]},
+            "Zone 1 (Day) - V 2.0": {"done": [160, 153, 162, 165, 0, 165, 167], "visited": [13, 15, 9, 7, 0, 10, 5], "todo": [0, 0, 0, 0, 0, 0, 0]},
+            "Zone 1 (Day) - V 2.0 (Friday)": {"done": [0, 0, 0, 0, 130, 0, 0], "visited": [0, 0, 0, 0, 3, 0, 0], "todo": [0, 0, 0, 0, 0, 0, 0]},
+            "Zone 1 (Night-1) - V 2.0": {"done": [50, 50, 50, 50, 0, 50, 50], "visited": [0, 0, 0, 0, 0, 0, 0], "todo": [0, 0, 0, 0, 0, 0, 0]},
+            "Zone 1 (Night-1) - V 2.0 (Friday)": {"done": [0, 0, 0, 0, 75, 0, 0], "visited": [0, 0, 0, 0, 0, 0, 0], "todo": [0, 0, 0, 0, 9, 0, 0]},
+            "Zone 1 (Night-2) - V 2.0": {"done": [58, 55, 56, 55, 57, 0, 55], "visited": [1, 0, 0, 0, 0, 0, 0], "todo": [0, 0, 0, 0, 0, 0, 0]},
+            "Zone 2 - A (Residence) - V 2.0": {"done": [73, 73, 74, 75, 0, 72, 72], "visited": [6, 5, 6, 5, 0, 7, 8], "todo": [0, 0, 0, 1, 0, 0, 0]},
+            "Zone 2 - A (Residence) - V 2.0 (Friday)": {"done": [0, 0, 0, 0, 70, 0, 0], "visited": [0, 0, 0, 0, 6, 0, 0], "todo": [0, 0, 0, 0, 2, 0, 0]},
+            "Zone 2 A (Day) - V 2.0": {"done": [306, 309, 295, 305, 0, 308, 304], "visited": [11, 10, 16, 12, 0, 13, 12], "todo": [5, 6, 6, 7, 0, 8, 5]},
+            "Zone 2 A (Friday) V 2.0": {"done": [0, 0, 0, 0, 721, 0, 0], "visited": [0, 0, 0, 0, 22, 0, 0], "todo": [0, 0, 0, 0, 6, 0, 0]},
+            "Zone 2 A (Night-1) - V 2.0": {"done": [193, 192, 193, 193, 0, 191, 192], "visited": [8, 9, 8, 8, 0, 11, 9], "todo": [0, 0, 0, 0, 0, 0, 0]},
+            "Zone 2 A (Night-2) - V 2.0": {"done": [178, 176, 177, 179, 0, 0, 176], "visited": [5, 6, 6, 6, 0, 0, 5], "todo": [0, 0, 0, 0, 0, 0, 0]},
+            "Zone 2 B (Day) - V 2.0": {"done": [0, 303, 347, 349, 0, 199, 342], "visited": [0, 3, 9, 9, 0, 4, 12], "todo": [0, 45, 0, 0, 0, 148, 10]},
+            "Zone 2 B (Friday) V 2.0": {"done": [0, 0, 0, 0, 568, 0, 0], "visited": [0, 0, 0, 0, 4, 0, 0], "todo": [0, 0, 0, 0, 30, 0, 0]},
+            "Zone 2 B (Magna) - V 2.0": {"done": [92, 0, 0, 0, 0, 0, 0], "visited": [4, 0, 0, 0, 0, 0, 0], "todo": [0, 0, 0, 0, 0, 0, 0]},
+            "Zone 2 B (Night-1) - V 2.0": {"done": [221, 229, 236, 228, 0, 230, 224], "visited": [0, 7, 6, 7, 0, 7, 7], "todo": [0, 12, 16, 20, 0, 16, 19]},
+            "Zone 2 B (Night-2) - V 2.0": {"done": [128, 126, 125, 127, 0, 0, 129], "visited": [0, 0, 0, 0, 0, 0, 0], "todo": [3, 1, 4, 3, 0, 0, 3]},
+            "Zone 2 C (Day) - V 2.0": {"done": [332, 348, 335, 333, 0, 349, 353], "visited": [0, 0, 0, 0, 0, 0, 1], "todo": [6, 13, 10, 9, 0, 2, 1]},
+            "Zone 2 C (Friday) V 2.0": {"done": [0, 0, 0, 0, 820, 0, 0], "visited": [0, 0, 0, 0, 0, 0, 0], "todo": [0, 0, 0, 0, 47, 0, 0]},
+            "Zone 2 C (Night-1) - V 2.0": {"done": [235, 260, 260, 203, 0, 218, 200], "visited": [0, 0, 0, 0, 0, 0, 0], "todo": [34, 7, 7, 62, 0, 45, 61]},
+            "Zone 2 C (Night-2) - V 2.0": {"done": [252, 247, 244, 225, 0, 0, 248], "visited": [0, 0, 0, 0, 0, 0, 0], "todo": [21, 18, 18, 29, 0, 0, 17]},
+            "Zone 3 (AlQan) - V 2.0": {"done": [117, 0, 0, 130, 0, 0, 0], "visited": [1, 0, 0, 3, 0, 0, 0], "todo": [97, 0, 0, 86, 0, 0, 0]},
+            "Zone 3 (Haqal & Jadeed) - V 2.0": {"done": [0, 143, 0, 0, 0, 144, 0], "visited": [0, 10, 0, 0, 0, 9, 0], "todo": [0, 0, 0, 0, 0, 1, 0]},
+            "Zone 3 (Zyath & Highway) - V 2.0": {"done": [0, 0, 0, 0, 149, 0, 0], "visited": [0, 0, 0, 0, 9, 0, 0], "todo": [0, 0, 0, 0, 5, 0, 0]},
+            "Zone 3 (Zyath Village) - V 2.0": {"done": [0, 0, 191, 0, 0, 0, 100], "visited": [0, 0, 9, 0, 0, 0, 2], "todo": [0, 0, 9, 0, 0, 0, 66]},
+            "Zone 4 - AlSuru - V 2.0": {"done": [81, 0, 0, 0, 0, 70, 0], "visited": [5, 0, 0, 0, 0, 5, 0], "todo": [21, 0, 0, 0, 0, 32, 0]},
+            "Zone 4 - Bajdah (Friday) V 2.0": {"done": [0, 0, 0, 0, 81, 0, 0], "visited": [0, 0, 0, 0, 6, 0, 0], "todo": [0, 0, 0, 0, 0, 0, 0]},
+            "Zone 4 - Bajdah - V 2.0": {"done": [0, 77, 0, 70, 0, 0, 0], "visited": [0, 6, 0, 9, 0, 0, 0], "todo": [0, 3, 0, 4, 0, 0, 76]},
+            "Zone 4 - Nima V 2.0": {"done": [114, 117, 0, 99, 0, 101, 72], "visited": [6, 6, 0, 14, 0, 11, 4], "todo": [5, 5, 0, 12, 0, 20, 53]},
+            "Zone 5 - Shigri (Friday) V 2.0": {"done": [0, 0, 0, 0, 139, 0, 0], "visited": [0, 0, 0, 0, 15, 0, 0], "todo": [0, 0, 0, 0, 2, 0, 0]},
+            "Zone 5 (Shigri Village - Left) - V 2.0": {"done": [0, 140, 0, 0, 0, 0, 138], "visited": [0, 19, 0, 0, 0, 0, 20], "todo": [0, 1, 0, 0, 0, 0, 1]},
+            "Zone 5 (Shigri Village - Right) - V 2.0": {"done": [135, 0, 138, 0, 0, 140, 0], "visited": [17, 0, 18, 0, 0, 19, 0], "todo": [3, 0, 2, 0, 0, 0, 0]},
+            "Zone 6 (Village B) - V 2.0": {"done": [170, 163, 106, 34, 83, 118, 165], "visited": [5, 6, 1, 0, 0, 0, 0], "todo": [11, 4, 79, 0, 0, 0, 0]}
+        };
+
+        let dailyChart;
+
+        function createDailyChart(routeKey) {
+            const data = dailyData[routeKey];
+            const ctx = document.getElementById('dailyChart');
+            
+            if (dailyChart) dailyChart.destroy();
+
+            dailyChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Jan 5', 'Jan 6', 'Jan 7', 'Jan 8', 'Jan 9', 'Jan 10', 'Jan 11'],
+                    datasets: [
+                        { label: 'Done', data: data.done, backgroundColor: '#10b981', borderRadius: 4, barPercentage: 0.7 },
+                        { label: 'Visited', data: data.visited, backgroundColor: '#f59e0b', borderRadius: 4, barPercentage: 0.7 },
+                        { label: 'To Do', data: data.todo, backgroundColor: '#374151', borderRadius: 4, barPercentage: 0.7 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'top', align: 'end', labels: { boxWidth: 12, padding: 20 } } },
+                    scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, grid: { color: '#1f2937' } } }
+                }
+            });
+        }
+
+        createDailyChart('all');
+        document.getElementById('routeFilter').addEventListener('change', e => createDailyChart(e.target.value));
+
+        new Chart(document.getElementById('vehicleChart'), {
+            type: 'bar',
+            data: {
+                labels: ['REL 6', 'REL 5', 'REL 9', 'REL 15', 'REL 1', 'REL 7', 'REL 11', 'REL 13', 'REL 14', 'REL 12'],
+                datasets: [{
+                    label: 'Completion Rate %',
+                    data: [96.5, 95.4, 95.2, 94.0, 92.0, 89.7, 88.8, 87.6, 76.0, 74.4],
+                    backgroundColor: ctx => {
+                        const v = ctx.raw;
+                        if (v >= 90) return '#10b981';
+                        if (v >= 85) return '#3b82f6';
+                        if (v >= 75) return '#f59e0b';
+                        return '#ef4444';
+                    },
+                    borderRadius: 4,
+                    barPercentage: 0.6
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { x: { min: 0, max: 100, grid: { color: '#1f2937' }, ticks: { callback: v => v + '%' } }, y: { grid: { display: false } } }
+            }
+        });
+
+        new Chart(document.getElementById('statusChart'), {
+            type: 'doughnut',
+            data: {
+                labels: ['Done', 'To Do', 'Visited'],
+                datasets: [{ data: [20600, 1408, 598], backgroundColor: ['#10b981', '#374151', '#f59e0b'], borderWidth: 0, cutout: '70%' }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'right', labels: { padding: 20, usePointStyle: true, pointStyle: 'circle' } } }
+            }
+        });
+
+        new Chart(document.getElementById('dowChart'), {
+            type: 'line',
+            data: {
+                labels: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+                datasets: [{
+                    label: 'Completion Rate',
+                    data: [88.5, 91.0, 93.7, 92.7, 90.1, 94.7, 86.8],
+                    borderColor: '#06b6d4',
+                    backgroundColor: 'rgba(6, 182, 212, 0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    pointBackgroundColor: '#06b6d4',
+                    pointBorderColor: '#0a0f1a',
+                    pointBorderWidth: 2,
+                    pointRadius: 5
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { x: { grid: { display: false } }, y: { min: 80, max: 100, grid: { color: '#1f2937' }, ticks: { callback: v => v + '%' } } }
+            }
+        });
+    </script>
+</body>
+</html>
